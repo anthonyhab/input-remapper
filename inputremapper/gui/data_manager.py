@@ -28,10 +28,10 @@ from gi.repository import GLib
 from inputremapper.configs.global_config import GlobalConfig
 from inputremapper.configs.input_config import InputCombination, InputConfig
 from inputremapper.configs.keyboard_layout import KeyboardLayout
+from inputremapper.configs.mapping import MappingData, UIMapping
 from inputremapper.configs.paths import PathUtils
 from inputremapper.configs.preset import Preset
 from inputremapper.configs.profile_switching_config import ProfileSwitchingConfig
-from inputremapper.configs.keyboard_layout import KeyboardLayout
 from inputremapper.daemon import DaemonProxy
 from inputremapper.exceptions import DataManagementError
 from inputremapper.groups import _Group
