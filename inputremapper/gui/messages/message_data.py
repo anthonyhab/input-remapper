@@ -19,7 +19,7 @@
 
 import re
 from dataclasses import dataclass
-from typing import Dict, Tuple, Optional, Callable
+from typing import Dict, Tuple, Optional, Callable, Any
 
 from inputremapper.configs.input_config import InputCombination
 from inputremapper.configs.mapping import MappingData
@@ -124,3 +124,27 @@ class DoStackSwitch:
 
     message_type = MessageType.do_stack_switch
     page_index: int
+
+
+@dataclass(frozen=True)
+class ProfileSwitchingEnabledData:
+    """Message with profile switching enabled state."""
+
+    message_type = MessageType.profile_switching_enabled
+    enabled: bool
+
+
+@dataclass(frozen=True)
+class ActiveProfileChangedData:
+    """Message with the active profile name."""
+
+    message_type = MessageType.active_profile_changed
+    profile_name: Optional[str]
+
+
+@dataclass(frozen=True)
+class ProfilesListChangedData:
+    """Message with the list of profiles."""
+
+    message_type = MessageType.profiles_list_changed
+    profiles: Tuple[str, ...]

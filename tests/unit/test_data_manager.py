@@ -41,6 +41,9 @@ from inputremapper.gui.messages.message_broker import (
 from inputremapper.gui.messages.message_data import (
     GroupData,
     CombinationUpdate,
+    ProfileSwitchingEnabledData,
+    ActiveProfileChangedData,
+    ProfilesListChangedData,
 )
 from inputremapper.gui.reader_client import ReaderClient
 from inputremapper.injection.global_uinputs import GlobalUInputs, FrontendUInput
@@ -969,3 +972,174 @@ class TestDataManager(unittest.TestCase):
 
     def test_cannot_get_injector_state_without_group(self):
         self.assertRaises(DataManagementError, self.data_manager.get_state)
+
+    # Profile Switching Tests
+
+    def test_profile_switching_enabled(self):
+        """DataManager loads/saves enabled state."""
+        listener = Listener()
+        self.message_broker.subscribe(MessageType.profile_switching_enabled, listener)
+
+        # Initially should be False (default)
+        self.assertFalse(self.data_manager.get_profile_switching_enabled())
+
+        # Enable profile switching
+        self.data_manager.set_profile_switching_enabled(True)
+        self.assertTrue(self.data_manager.get_profile_switching_enabled())
+        self.assertEqual(len(listener.calls), 1)
+        self.assertIsInstance(listener.calls[0], ProfileSwitchingEnabledData)
+        self.assertTrue(listener.calls[0].enabled)
+
+        # Disable profile switching
+        self.data_manager.set_profile_switching_enabled(False)
+        self.assertFalse(self.data_manager.get_profile_switching_enabled())
+        self.assertEqual(len(listener.calls), 2)
+        self.assertFalse(listener.calls[1].enabled)
+
+    def test_active_profile(self):
+        """DataManager sets/gets active profile."""
+        listener = Listener()
+        self.message_broker.subscribe(MessageType.active_profile_changed, listener)
+
+        # Initially should be None
+        self.assertIsNone(self.data_manager.get_active_profile())
+
+        # Set active profile
+        self.data_manager.set_active_profile("gaming")
+        self.assertEqual(self.data_manager.get_active_profile(), "gaming")
+        self.assertEqual(len(listener.calls), 1)
+        self.assertIsInstance(listener.calls[0], ActiveProfileChangedData)
+        self.assertEqual(listener.calls[0].profile_name, "gaming")
+
+        # Clear active profile
+        self.data_manager.set_active_profile(None)
+        self.assertIsNone(self.data_manager.get_active_profile())
+        self.assertEqual(len(listener.calls), 2)
+        self.assertIsNone(listener.calls[1].profile_name)
+
+    def test_create_profile(self):
+        """DataManager creates profile and publishes message."""
+        listener = Listener()
+        self.message_broker.subscribe(MessageType.profiles_list_changed, listener)
+
+        # Create a profile
+        self.data_manager.create_profile("work")
+
+        # Verify profile was created
+        profiles = self.data_manager.get_profiles()
+        self.assertIn("work", profiles)
+
+        # Verify message was published
+        self.assertEqual(len(listener.calls), 1)
+        self.assertIsInstance(listener.calls[0], ProfilesListChangedData)
+        self.assertIn("work", listener.calls[0].profiles)
+
+    def test_delete_profile(self):
+        """DataManager deletes profile and publishes messages."""
+        profile_listener = Listener()
+        active_listener = Listener()
+        self.message_broker.subscribe(
+            MessageType.profiles_list_changed, profile_listener
+        )
+        self.message_broker.subscribe(
+            MessageType.active_profile_changed, active_listener
+        )
+
+        # Create and set active profile
+        self.data_manager.create_profile("test_profile")
+        self.data_manager.set_active_profile("test_profile")
+
+        # Clear previous messages
+        profile_listener.calls.clear()
+        active_listener.calls.clear()
+
+        # Delete the profile
+        self.data_manager.delete_profile("test_profile")
+
+        # Verify profile was deleted
+        profiles = self.data_manager.get_profiles()
+        self.assertNotIn("test_profile", profiles)
+
+        # Verify messages were published
+        self.assertEqual(len(profile_listener.calls), 1)
+        self.assertNotIn("test_profile", profile_listener.calls[0].profiles)
+
+        # Active profile should be cleared since we deleted the active one
+        self.assertEqual(len(active_listener.calls), 1)
+        self.assertIsNone(active_listener.calls[0].profile_name)
+
+    def test_rename_profile(self):
+        """DataManager renames profile and publishes messages."""
+        profile_listener = Listener()
+        active_listener = Listener()
+        self.message_broker.subscribe(
+            MessageType.profiles_list_changed, profile_listener
+        )
+        self.message_broker.subscribe(
+            MessageType.active_profile_changed, active_listener
+        )
+
+        # Create and set active profile
+        self.data_manager.create_profile("old_name")
+        self.data_manager.set_active_profile("old_name")
+
+        # Clear previous messages
+        profile_listener.calls.clear()
+        active_listener.calls.clear()
+
+        # Rename the profile
+        self.data_manager.rename_profile("old_name", "new_name")
+
+        # Verify profile was renamed
+        profiles = self.data_manager.get_profiles()
+        self.assertNotIn("old_name", profiles)
+        self.assertIn("new_name", profiles)
+
+        # Verify messages were published
+        self.assertEqual(len(profile_listener.calls), 1)
+        self.assertIn("new_name", profile_listener.calls[0].profiles)
+
+        # Active profile should be updated
+        self.assertEqual(len(active_listener.calls), 1)
+        self.assertEqual(active_listener.calls[0].profile_name, "new_name")
+
+    def test_get_profile(self):
+        """DataManager gets a single profile by name."""
+        # Create a profile
+        self.data_manager.create_profile("single_test")
+
+        # Get the profile
+        profile = self.data_manager.get_profile("single_test")
+        self.assertIsNotNone(profile)
+        self.assertIn("defaults", profile)
+        self.assertIn("rules", profile)
+
+        # Get non-existent profile
+        missing = self.data_manager.get_profile("does_not_exist")
+        self.assertIsNone(missing)
+
+    def test_profile_messages_published(self):
+        """Messages sent on state changes."""
+        enabled_listener = Listener()
+        active_listener = Listener()
+        list_listener = Listener()
+
+        self.message_broker.subscribe(
+            MessageType.profile_switching_enabled, enabled_listener
+        )
+        self.message_broker.subscribe(
+            MessageType.active_profile_changed, active_listener
+        )
+        self.message_broker.subscribe(MessageType.profiles_list_changed, list_listener)
+
+        # Enable profile switching
+        self.data_manager.set_profile_switching_enabled(True)
+        self.assertEqual(len(enabled_listener.calls), 1)
+
+        # Create profile
+        self.data_manager.create_profile("msg_test")
+        self.assertEqual(len(list_listener.calls), 1)
+
+        # Set active profile
+        self.data_manager.set_active_profile("msg_test")
+        self.assertEqual(len(active_listener.calls), 1)

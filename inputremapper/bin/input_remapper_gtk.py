@@ -51,6 +51,7 @@ from inputremapper.injection.global_uinputs import GlobalUInputs, FrontendUInput
 from inputremapper.groups import _Groups
 from inputremapper.gui.reader_client import ReaderClient
 from inputremapper.configs.global_config import GlobalConfig
+from inputremapper.configs.profile_switching_config import ProfileSwitchingConfig
 from inputremapper.configs.migrations import Migrations
 
 

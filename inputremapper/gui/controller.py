@@ -67,6 +67,9 @@ from inputremapper.gui.messages.message_data import (
     CombinationRecorded,
     UserConfirmRequest,
     DoStackSwitch,
+    ProfileSwitchingEnabledData,
+    ActiveProfileChangedData,
+    ProfilesListChangedData,
 )
 from inputremapper.gui.utils import CTX_APPLY, CTX_ERROR, CTX_WARNING, CTX_MAPPING
 from inputremapper.injection.injector import (
@@ -803,7 +806,7 @@ class Controller:
         if changes["mapping_type"] == MappingType.ANALOG.value:
             msg = _("You are about to change the mapping to analog.")
             if mapping.output_symbol:
-                msg += _('\nThis will remove "{}" ' "from the text input!").format(
+                msg += _('\nThis will remove "{}" from the text input!').format(
                     mapping.output_symbol
                 )
 
@@ -874,3 +877,25 @@ class Controller:
                 return None
 
         return changes
+
+    # Profile Switching Controller Methods
+
+    def toggle_profile_switching(self, enabled: bool):
+        """Toggle profile switching on/off."""
+        self.data_manager.set_profile_switching_enabled(enabled)
+
+    def set_active_profile(self, name: Optional[str]):
+        """Set the active profile."""
+        self.data_manager.set_active_profile(name)
+
+    def create_profile(self, name: str):
+        """Create a new profile."""
+        self.data_manager.create_profile(name)
+
+    def delete_profile(self, name: str):
+        """Delete a profile."""
+        self.data_manager.delete_profile(name)
+
+    def rename_profile(self, old: str, new: str):
+        """Rename a profile."""
+        self.data_manager.rename_profile(old, new)

@@ -21,15 +21,16 @@ import glob
 import os
 import re
 import time
-from typing import Optional, List, Tuple, Set
+from typing import Optional, List, Tuple, Set, Dict, Any
 
 from gi.repository import GLib
 
 from inputremapper.configs.global_config import GlobalConfig
 from inputremapper.configs.input_config import InputCombination, InputConfig
-from inputremapper.configs.mapping import UIMapping, MappingData
+from inputremapper.configs.keyboard_layout import KeyboardLayout
 from inputremapper.configs.paths import PathUtils
 from inputremapper.configs.preset import Preset
+from inputremapper.configs.profile_switching_config import ProfileSwitchingConfig
 from inputremapper.configs.keyboard_layout import KeyboardLayout
 from inputremapper.daemon import DaemonProxy
 from inputremapper.exceptions import DataManagementError
@@ -43,6 +44,9 @@ from inputremapper.gui.messages.message_data import (
     GroupData,
     PresetData,
     CombinationUpdate,
+    ProfileSwitchingEnabledData,
+    ActiveProfileChangedData,
+    ProfilesListChangedData,
 )
 from inputremapper.gui.reader_client import ReaderClient
 from inputremapper.injection.global_uinputs import GlobalUInputs
@@ -84,6 +88,9 @@ class DataManager:
 
         self._config = config
         self._config.load_config()
+
+        self._profile_config = ProfileSwitchingConfig()
+        self._profile_config.load()
 
         self._active_preset: Optional[Preset[UIMapping]] = None
         self._active_mapping: Optional[UIMapping] = None
@@ -376,7 +383,7 @@ class DataManager:
         new_path = PathUtils.get_preset_path(self.active_group.name, new_name)
         if os.path.exists(new_path):
             raise ValueError(
-                f"cannot rename {old_name} to " f"{new_name}, preset already exists"
+                f"cannot rename {old_name} to {new_name}, preset already exists"
             )
 
         logger.info('Moving "%s" to "%s"', old_path, new_path)
@@ -607,3 +614,81 @@ class DataManager:
             return True
 
         GLib.timeout_add(100, do)
+
+    # Profile Switching Methods
+
+    def get_profile_switching_enabled(self) -> bool:
+        """Get the profile switching enabled state."""
+        return self._profile_config.is_enabled()
+
+    def set_profile_switching_enabled(self, enabled: bool):
+        """Set the profile switching enabled state.
+
+        Will send "profile_switching_enabled" message on the MessageBroker.
+        """
+        self._profile_config.set_enabled(enabled)
+        self._profile_config.save()
+        self.message_broker.publish(ProfileSwitchingEnabledData(enabled))
+
+    def get_active_profile(self) -> Optional[str]:
+        """Get the active profile name."""
+        return self._profile_config.get_active_profile()
+
+    def set_active_profile(self, name: Optional[str]):
+        """Set the active profile.
+
+        Will send "active_profile_changed" message on the MessageBroker.
+        """
+        self._profile_config.set_active_profile(name)
+        self._profile_config.save()
+        self.message_broker.publish(ActiveProfileChangedData(name))
+
+    def get_profiles(self) -> Dict[str, Any]:
+        """Get all profiles as a dict."""
+        return self._profile_config.get_profiles()
+
+    def create_profile(self, name: str):
+        """Create a new profile.
+
+        Will send "profiles_list_changed" message on the MessageBroker.
+        """
+        self._profile_config.create_profile(name)
+        self._profile_config.save()
+        self._publish_profiles_list()
+
+    def delete_profile(self, name: str):
+        """Delete a profile.
+
+        Will send "profiles_list_changed" and possibly "active_profile_changed"
+        message on the MessageBroker.
+        """
+        active = self.get_active_profile()
+        self._profile_config.delete_profile(name)
+        self._profile_config.save()
+        self._publish_profiles_list()
+        if active == name:
+            self.message_broker.publish(ActiveProfileChangedData(None))
+
+    def rename_profile(self, old: str, new: str):
+        """Rename a profile.
+
+        Will send "profiles_list_changed" and possibly "active_profile_changed"
+        message on the MessageBroker.
+        """
+        active = self.get_active_profile()
+        self._profile_config.rename_profile(old, new)
+        self._profile_config.save()
+        self._publish_profiles_list()
+        if active == old:
+            self.message_broker.publish(ActiveProfileChangedData(new))
+
+    def get_profile(self, name: str) -> Optional[Dict]:
+        """Get a single profile by name."""
+        return self._profile_config.get_profile(name)
+
+    def _publish_profiles_list(self):
+        """Publish the profiles list to the MessageBroker."""
+        profiles = self.get_profiles()
+        self.message_broker.publish(
+            ProfilesListChangedData(tuple(sorted(profiles.keys())))
+        )

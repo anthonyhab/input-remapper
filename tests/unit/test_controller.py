@@ -1625,3 +1625,43 @@ class TestController(unittest.TestCase):
                 output_type=None,
                 output_code=None,
             )
+
+    # Profile Switching Controller Tests
+
+    def test_controller_toggle_profile_switching(self):
+        """Controller toggles profile switching via DataManager."""
+        with patch.object(self.data_manager, "set_profile_switching_enabled") as mock:
+            self.controller.toggle_profile_switching(True)
+            mock.assert_called_once_with(True)
+
+        with patch.object(self.data_manager, "set_profile_switching_enabled") as mock:
+            self.controller.toggle_profile_switching(False)
+            mock.assert_called_once_with(False)
+
+    def test_controller_set_active_profile(self):
+        """Controller sets active profile via DataManager."""
+        with patch.object(self.data_manager, "set_active_profile") as mock:
+            self.controller.set_active_profile("gaming")
+            mock.assert_called_once_with("gaming")
+
+        with patch.object(self.data_manager, "set_active_profile") as mock:
+            self.controller.set_active_profile(None)
+            mock.assert_called_once_with(None)
+
+    def test_controller_create_profile(self):
+        """Controller creates profile via DataManager."""
+        with patch.object(self.data_manager, "create_profile") as mock:
+            self.controller.create_profile("work_profile")
+            mock.assert_called_once_with("work_profile")
+
+    def test_controller_delete_profile(self):
+        """Controller deletes profile via DataManager."""
+        with patch.object(self.data_manager, "delete_profile") as mock:
+            self.controller.delete_profile("unused_profile")
+            mock.assert_called_once_with("unused_profile")
+
+    def test_controller_rename_profile(self):
+        """Controller renames profile via DataManager."""
+        with patch.object(self.data_manager, "rename_profile") as mock:
+            self.controller.rename_profile("old_name", "new_name")
+            mock.assert_called_once_with("old_name", "new_name")

@@ -55,6 +55,11 @@ class MessageType(Enum):
 
     do_stack_switch = "do_stack_switch"
 
+    # profile switching messages:
+    profile_switching_enabled = "profile_switching_enabled"
+    active_profile_changed = "active_profile_changed"
+    profiles_list_changed = "profiles_list_changed"
+
     # for unit tests:
     test1 = "test1"
     test2 = "test2"
