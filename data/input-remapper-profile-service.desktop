@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Exec=input-remapper-profile-service
+Name=input-remapper-profile-service
+Icon=input-remapper
+Comment=Automatically switches input-remapper presets based on focused application

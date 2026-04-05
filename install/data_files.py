@@ -50,6 +50,8 @@ def get_data_files() -> list[tuple[str, list[str]]]:
         ("usr/bin/", ["bin/input-remapper-service"]),
         ("usr/bin/", ["bin/input-remapper-control"]),
         ("usr/bin/", ["bin/input-remapper-reader-service"]),
+        ("usr/bin/", ["bin/input-remapper-profile-service"]),
+        ("etc/xdg/autostart/", ["data/input-remapper-profile-service.desktop"]),
     ]
 
 
