@@ -19,6 +19,7 @@
 
 
 """User Interface."""
+
 from typing import Dict, Callable
 
 from gi.repository import Gtk, GtkSource, Gdk, GObject
@@ -51,6 +52,7 @@ from inputremapper.gui.components.editor import (
 )
 from inputremapper.gui.components.main import Stack, StatusBar
 from inputremapper.gui.components.presets import PresetSelection
+from inputremapper.gui.components.profiles import ProfilesPage
 from inputremapper.gui.controller import Controller
 from inputremapper.gui.gettext import _
 from inputremapper.gui.messages.message_broker import (
@@ -205,6 +207,9 @@ class UserInterface:
 
         GdkEventRecorder(self.window, self.get("gdk-event-recorder-label"))
 
+        # Profile management page
+        ProfilesPage(message_broker, controller, self.get)
+
         RequireActiveMapping(
             message_broker,
             self.get("edit-combination-btn"),
@@ -234,8 +239,7 @@ class UserInterface:
         # dialog is not centered when it is opened for the first time
         self.about.set_position(Gtk.WindowPosition.CENTER_ON_PARENT)
         self.get("version-label").set_text(
-            f"input-remapper {VERSION} {COMMIT_HASH[:7]}"
-            f"\npython-evdev {EVDEV_VERSION}"
+            f"input-remapper {VERSION} {COMMIT_HASH[:7]}\npython-evdev {EVDEV_VERSION}"
             if EVDEV_VERSION
             else ""
         )

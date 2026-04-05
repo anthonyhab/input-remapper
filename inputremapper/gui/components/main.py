@@ -20,7 +20,6 @@
 
 """Components that wrap everything."""
 
-
 from __future__ import annotations
 
 from gi.repository import Gtk, Pango
@@ -40,6 +39,7 @@ class Stack:
     devices_page = 0
     presets_page = 1
     editor_page = 2
+    profiles_page = 3
 
     def __init__(
         self,
