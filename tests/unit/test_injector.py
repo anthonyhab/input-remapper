@@ -58,6 +58,7 @@ from inputremapper.injection.injector import (
     is_in_capabilities,
     InjectorState,
     get_udev_name,
+    InjectorCommand,
 )
 from inputremapper.injection.numlock import is_numlock_on
 from inputremapper.input_event import InputEvent
@@ -277,7 +278,7 @@ class TestInjector(unittest.IsolatedAsyncioTestCase):
         )
         suffix = "mapped"
         prefix = "input-remapper"
-        expected = f'{prefix} {"a" * (80 - len(suffix) - len(prefix) - 2)} {suffix}'
+        expected = f"{prefix} {'a' * (80 - len(suffix) - len(prefix) - 2)} {suffix}"
         self.assertEqual(len(expected), 80)
         self.assertEqual(get_udev_name("a" * 100, suffix), expected)
 
@@ -685,6 +686,54 @@ class TestModifyCapabilities(unittest.TestCase):
         self.assertListEqual(capabilities[EV_KEY], [1, 2, 3])
         self.assertListEqual(capabilities[EV_REL], [11, 12, 13])
         self.assertEqual(capabilities[EV_ABS][0][1].max, 500)
+
+
+@test_setup
+class TestSwitchPreset(unittest.TestCase):
+    def setUp(self):
+        self.global_uinputs = GlobalUInputs(UInput)
+        self.global_uinputs.prepare_all()
+        self.mapping_parser = MappingParser(self.global_uinputs)
+
+    def tearDown(self):
+        pass
+
+    def test_switch_preset_sends_message(self):
+        """switch_preset should send SWITCH_PRESET command with preset via pipe."""
+        preset = Preset()
+        preset.add(
+            Mapping.from_combination(
+                InputCombination([InputConfig(type=EV_KEY, code=KEY_A)]),
+                "keyboard",
+                "a",
+            )
+        )
+
+        injector = Injector(
+            groups.find(key="Foo Device 2"),
+            preset,
+            self.mapping_parser,
+        )
+
+        self.assertTrue(hasattr(InjectorCommand, "SWITCH_PRESET"))
+        self.assertEqual(InjectorCommand.SWITCH_PRESET, "SWITCH_PRESET")
+
+        self.assertTrue(hasattr(injector, "switch_preset"))
+
+        new_preset = Preset()
+        new_preset.add(
+            Mapping.from_combination(
+                InputCombination([InputConfig(type=EV_KEY, code=KEY_A)]),
+                "keyboard",
+                "b",
+            )
+        )
+
+        injector.switch_preset(new_preset)
+
+        msg = injector._msg_pipe[0].recv()
+        self.assertEqual(msg[0], InjectorCommand.SWITCH_PRESET)
+        self.assertEqual(msg[1].name, new_preset.name)
 
 
 if __name__ == "__main__":

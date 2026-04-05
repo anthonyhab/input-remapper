@@ -20,9 +20,50 @@
 
 import json
 import os
+import sys
 import time
+import types
 import unittest
 from unittest.mock import patch, MagicMock
+
+# Mock dasbus before importing daemon
+if "dasbus" not in sys.modules:
+
+    class _MockDBusError(Exception):
+        pass
+
+    class _MockProxy:
+        def Introspect(self, timeout=0):
+            return ""
+
+    class _MockSystemMessageBus:
+        pass
+
+    class _MockDBusServiceIdentifier:
+        def __init__(self, **kwargs):
+            self.interface_name = kwargs.get("interface_name", "test")
+
+        def get_proxy(self, **kwargs):
+            return _MockProxy()
+
+    class _MockEventLoop:
+        def run(self):
+            pass
+
+    _dasbus = types.ModuleType("dasbus")
+    _dasbus.error = types.ModuleType("dasbus.error")
+    _dasbus.error.DBusError = _MockDBusError
+    _dasbus.connection = types.ModuleType("dasbus.connection")
+    _dasbus.connection.SystemMessageBus = _MockSystemMessageBus
+    _dasbus.identifier = types.ModuleType("dasbus.identifier")
+    _dasbus.identifier.DBusServiceIdentifier = _MockDBusServiceIdentifier
+    _dasbus.loop = types.ModuleType("dasbus.loop")
+    _dasbus.loop.EventLoop = _MockEventLoop
+    sys.modules["dasbus"] = _dasbus
+    sys.modules["dasbus.error"] = _dasbus.error
+    sys.modules["dasbus.connection"] = _dasbus.connection
+    sys.modules["dasbus.identifier"] = _dasbus.identifier
+    sys.modules["dasbus.loop"] = _dasbus.loop
 
 import evdev
 from evdev._ecodes import EV_ABS
@@ -569,6 +610,84 @@ class TestDaemon(unittest.TestCase):
         self.assertEqual(history[group.key][1], preset_name)
         self.assertEqual(self.daemon.get_state(group.key), InjectorState.STARTING)
         self.assertIsNotNone(groups.find(key="Foo Device 2"))
+
+    def test_switch_preset_calls_injector(self):
+        """switch_preset should call injector.switch_preset when injector exists."""
+        group_key = "Qux/[Device]?"
+        group = groups.find(key=group_key)
+        preset_name = "preset8"
+        new_preset_name = "preset9"
+
+        daemon = Daemon(
+            self.global_config,
+            self.global_uinputs,
+            self.mapping_parser,
+        )
+        self.daemon = daemon
+
+        preset = Preset(group.get_preset_path(preset_name))
+        preset.add(
+            Mapping.from_combination(
+                InputCombination([InputConfig(type=EV_KEY, code=KEY_A)]),
+                "keyboard",
+                "a",
+            )
+        )
+        preset.save()
+
+        daemon.start_injecting(group_key, preset_name)
+        self.assertIn(group_key, daemon.injectors)
+
+        new_preset = Preset(group.get_preset_path(new_preset_name))
+        new_preset.add(
+            Mapping.from_combination(
+                InputCombination([InputConfig(type=EV_KEY, code=KEY_A)]),
+                "keyboard",
+                "b",
+            )
+        )
+        new_preset.save()
+
+        injector = daemon.injectors[group_key]
+        with patch.object(injector, "switch_preset") as mock_switch:
+            daemon.switch_preset(group_key, new_preset_name)
+            mock_switch.assert_called_once()
+            args = mock_switch.call_args[0]
+            self.assertIsInstance(args[0], Preset)
+
+        daemon.stop_injecting(group_key)
+        time.sleep(0.2)
+
+    def test_switch_preset_falls_back_to_start(self):
+        """switch_preset should fall back to start_injecting when no injector exists."""
+        group_key = "Qux/[Device]?"
+        group = groups.find(key=group_key)
+        preset_name = "preset8"
+
+        daemon = Daemon(
+            self.global_config,
+            self.global_uinputs,
+            self.mapping_parser,
+        )
+        self.daemon = daemon
+
+        preset = Preset(group.get_preset_path(preset_name))
+        preset.add(
+            Mapping.from_combination(
+                InputCombination([InputConfig(type=EV_KEY, code=KEY_A)]),
+                "keyboard",
+                "a",
+            )
+        )
+        preset.save()
+
+        self.assertNotIn(group_key, daemon.injectors)
+        result = daemon.switch_preset(group_key, preset_name)
+        self.assertTrue(result)
+        self.assertIn(group_key, daemon.injectors)
+
+        daemon.stop_injecting(group_key)
+        time.sleep(0.2)
 
 
 if __name__ == "__main__":

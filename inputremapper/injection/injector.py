@@ -19,6 +19,7 @@
 
 
 """Keeps injecting keycodes in the background based on the preset."""
+
 from __future__ import annotations
 
 import asyncio
@@ -56,6 +57,7 @@ DEV_NAME = "input-remapper"
 # messages sent to the injector process
 class InjectorCommand(str, enum.Enum):
     CLOSE = "CLOSE"
+    SWITCH_PRESET = "SWITCH_PRESET"
 
 
 # messages the injector process reports back to the service
@@ -194,6 +196,18 @@ class Injector(multiprocessing.Process):
         """
         logger.info('Stopping injecting keycodes for group "%s"', self.group.key)
         self._msg_pipe[1].send(InjectorCommand.CLOSE)
+
+    def switch_preset(self, preset: Preset) -> None:
+        """Switch to a new preset without tearing down the injector.
+
+        Can be safely called from the main process.
+        """
+        logger.info(
+            'Switching preset for group "%s" to "%s"',
+            self.group.key,
+            preset.name,
+        )
+        self._msg_pipe[1].send((InjectorCommand.SWITCH_PRESET, preset))
 
     """Process internal stuff."""
 
@@ -352,6 +366,9 @@ class Injector(multiprocessing.Process):
                 await self._close()
                 return
 
+            if isinstance(msg, tuple) and msg[0] == InjectorCommand.SWITCH_PRESET:
+                await self._switch_preset(msg[1])
+
     async def _close(self):
         logger.debug("Received close signal")
         self._stop_event.set()
@@ -365,6 +382,20 @@ class Injector(multiprocessing.Process):
         loop.stop()
 
         self._msg_pipe[0].send(InjectorState.STOPPED)
+
+    async def _switch_preset(self, preset: Preset) -> None:
+        """Switch to a new preset without tearing down the injector."""
+        logger.info("Switching to preset '%s'", preset.name)
+        self.preset = preset
+        preset.load()
+        self.context = Context(
+            self.preset,
+            self._source_devices,
+            self._forward_devices,
+            self.mapping_parser,
+        )
+        for reader in self._event_readers:
+            reader.context = self.context
 
     def _create_forwarding_device(self, source: evdev.InputDevice) -> evdev.UInput:
         # copy as much information as possible, because libinput uses the extra
@@ -421,22 +452,22 @@ class Injector(multiprocessing.Process):
 
         # grab devices as early as possible. If events appear that won't get
         # released anymore before the grab they appear to be held down forever
-        sources = self._grab_devices()
-        forward_devices = {}
-        for device_hash, device in sources.items():
-            forward_devices[device_hash] = self._create_forwarding_device(device)
+        self._source_devices = self._grab_devices()
+        self._forward_devices = {}
+        for device_hash, device in self._source_devices.items():
+            self._forward_devices[device_hash] = self._create_forwarding_device(device)
 
         # create this within the process after the event loop creation,
         # so that the macros use the correct loop
         self.context = Context(
             self.preset,
-            sources,
-            forward_devices,
+            self._source_devices,
+            self._forward_devices,
             self.mapping_parser,
         )
         self._stop_event = asyncio.Event()
 
-        if len(sources) == 0:
+        if len(self._source_devices) == 0:
             # maybe the preset was empty or something
             logger.error("Did not grab any device")
             self._msg_pipe[0].send(InjectorState.NO_GRAB)
@@ -445,11 +476,11 @@ class Injector(multiprocessing.Process):
         numlock_state = is_numlock_on()
         coroutines = []
 
-        for device_hash in sources:
+        for device_hash in self._source_devices:
             # actually doing things
             event_reader = EventReader(
                 self.context,
-                sources[device_hash],
+                self._source_devices[device_hash],
                 self._stop_event,
             )
             coroutines.append(event_reader.run())
@@ -479,7 +510,7 @@ class Injector(multiprocessing.Process):
             # reached otherwise.
             logger.debug("Injector coroutines ended")
 
-        for source in sources.values():
+        for source in self._source_devices.values():
             # ungrab at the end to make the next injection process not fail
             # its grabs
             try:
