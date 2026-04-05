@@ -682,8 +682,7 @@ class TestDaemon(unittest.TestCase):
         preset.save()
 
         self.assertNotIn(group_key, daemon.injectors)
-        result = daemon.switch_preset(group_key, preset_name)
-        self.assertTrue(result)
+        daemon.switch_preset(group_key, preset_name)
         self.assertIn(group_key, daemon.injectors)
 
         daemon.stop_injecting(group_key)

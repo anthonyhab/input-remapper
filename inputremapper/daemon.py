@@ -121,7 +121,7 @@ class DaemonProxy(Protocol):  # pragma: no cover
 
     def start_injecting(self, group_key: str, preset: str) -> bool: ...
 
-    def switch_preset(self, group_key: str, preset_name: str) -> bool: ...
+    def switch_preset(self, group_key: str, preset: str) -> None: ...
 
     def stop_all(self) -> None: ...
 
@@ -165,8 +165,7 @@ class Daemon:
                 </method>
                 <method name='switch_preset'>
                     <arg type='s' name='group_key' direction='in'/>
-                    <arg type='s' name='preset_name' direction='in'/>
-                    <arg type='b' name='response' direction='out'/>
+                    <arg type='s' name='preset' direction='in'/>
                 </method>
                 <method name='stop_all'>
                 </method>
@@ -537,7 +536,7 @@ class Daemon:
 
         return True
 
-    def switch_preset(self, group_key: str, preset_name: str) -> bool:
+    def switch_preset(self, group_key: str, preset: str) -> None:
         """Switch to a different preset without tearing down the injector.
 
         Falls back to start_injecting if no injector is running for the group.
@@ -546,47 +545,48 @@ class Daemon:
         ----------
         group_key
             The unique key of the group
-        preset_name
+        preset
             The name of the preset
         """
-        logger.info('Request to switch preset for "%s" to "%s"', group_key, preset_name)
+        logger.info('Request to switch preset for "%s" to "%s"', group_key, preset)
 
         if self.injectors.get(group_key) is None:
             logger.info(
                 'No injector for "%s", falling back to start_injecting', group_key
             )
-            return self.start_injecting(group_key, preset_name)
+            self.start_injecting(group_key, preset)
+            return
 
         if self.config_dir is None:
             logger.error(
                 "Request to switch preset before a user told the service about "
                 "their session using set_config_dir",
             )
-            return False
+            return
 
         group = groups.find(key=group_key)
 
         if group is None:
             logger.error('Could not find group "%s"', group_key)
-            return False
+            return
 
         preset_path = PurePath(
             self.config_dir,
             "presets",
             PathUtils.sanitize_path_component(group.name),
-            f"{preset_name}.json",
+            f"{preset}.json",
         )
 
-        preset = Preset(preset_path)
+        preset_obj = Preset(preset_path)
 
         try:
-            preset.load()
+            preset_obj.load()
         except FileNotFoundError as error:
             logger.error(str(error))
-            return False
+            return
 
         injector = self.injectors[group_key]
-        injector.switch_preset(preset)
+        injector.switch_preset(preset_obj)
 
         return True
 
