@@ -21,7 +21,6 @@
 
 """Path constants to be used."""
 
-
 import os
 import shutil
 from typing import List, Union, Optional
@@ -150,6 +149,11 @@ class PathUtils:
             return os.path.join(presets_base, group_name)
 
         return os.path.join(presets_base, group_name, preset)
+
+    @staticmethod
+    def profiles_path() -> str:
+        """Get the path to the profiles config file."""
+        return os.path.join(PathUtils.config_path(), "profiles.json")
 
     @staticmethod
     def get_config_path(*paths) -> str:
