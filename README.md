@@ -5,10 +5,10 @@
 <p align="center">
   An easy to use tool for Linux to change the behaviour of your input devices.<br/>
   Supports X11, Wayland, combinations, programmable macros, joysticks, wheels,<br/>
-  triggers, keys, mouse-movements and more. Maps any input to any other input.
+  triggers, keys, mouse-movements, per-application profile switching and more. Maps any input to any other input.
 </p>
 
-<p align="center"><a href="readme/usage.md">Usage</a> - <a href="readme/macros.md">Macros</a> - <a href="#installation">Installation</a> - <a href="readme/development.md">Development</a> - <a href="readme/examples.md">Examples</a></p>
+<p align="center"><a href="readme/usage.md">Usage</a> - <a href="readme/macros.md">Macros</a> - <a href="readme/profile-switching.md">Profile Switching</a> - <a href="#installation">Installation</a> - <a href="readme/development.md">Development</a> - <a href="readme/examples.md">Examples</a></p>
 
 <p align="center"><img src="readme/pylint.svg"/> <img src="readme/coverage.svg"/></p>
 
